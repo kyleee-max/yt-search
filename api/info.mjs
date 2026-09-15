@@ -24,8 +24,8 @@ export default async function handler(req, res) {
       error: "Query parameter 'id' is required"
     });
   }
-
-  const apiKey = process.env.YT_V3_KEY;
+  
+const apiKey = process.env.YOUTUBE_API_KEY;
 
   if (!apiKey) {
     return res.status(500).json({
