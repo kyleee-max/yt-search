@@ -22,7 +22,7 @@ export default async function handler(req, res) {
   try {
     const url = `https://www.youtube.com/watch?v=${encodeURIComponent(id)}`;
 
-    const info = await ytdl.getBasicInfo(url);
+    const info = await ytdl.getFullInfo(url);
     const video = info.videoDetails;
 
     return res.status(200).json({
