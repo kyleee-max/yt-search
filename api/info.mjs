@@ -1,4 +1,6 @@
-import YtdlCore from "@ybd-project/ytdl-core";
+import { YtdlCore } from "@ybd-project/ytdl-core/serverless";
+
+const ytdl = new YtdlCore();
 
 export default async function handler(req, res) {
   if (req.method !== "GET") {
@@ -20,7 +22,7 @@ export default async function handler(req, res) {
   try {
     const url = `https://www.youtube.com/watch?v=${encodeURIComponent(id)}`;
 
-    const info = await YtdlCore.getFullInfo(url);
+    const info = await ytdl.getBasicInfo(url);
     const video = info.videoDetails;
 
     return res.status(200).json({
@@ -28,13 +30,9 @@ export default async function handler(req, res) {
       result: {
         id: video.videoId,
         title: video.title,
-        author: {
-          name: video.author?.name ?? null,
-          id: video.author?.id ?? null
-        },
+        artist: video.author?.name ?? null,
         duration: Number(video.lengthSeconds) || null,
         thumbnail: video.thumbnails?.at(-1)?.url ?? null,
-        description: video.description ?? null,
         viewCount: Number(video.viewCount) || null,
         publishDate: video.publishDate ?? null
       }
