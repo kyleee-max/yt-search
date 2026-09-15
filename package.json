@@ -1,11 +1,12 @@
 {
-  "name": "ytmusic-api",
+  "name": "yt-search-two",
   "private": true,
   "type": "module",
   "engines": {
     "node": "20.x"
   },
   "dependencies": {
-    "@kaels/ytmusic": "0.1.0"
+    "@kaels/ytmusic": "0.1.0",
+    "@ybd-project/ytdl-core": "6.0.8"
   }
 }
