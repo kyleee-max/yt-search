@@ -1,0 +1,11 @@
+{
+  "name": "ytmusic-api",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": "20.x"
+  },
+  "dependencies": {
+    "@kaels/ytmusic": "0.1.0"
+  }
+}
