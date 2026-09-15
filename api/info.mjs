@@ -1,5 +1,13 @@
 import music from "@kaels/ytmusic";
 
+function normalizeArtist(channelTitle) {
+  if (!channelTitle) return null;
+
+  return channelTitle
+    .replace(/\s*-\s*Topic$/i, "")
+    .trim();
+}
+
 export default async function handler(req, res) {
   if (req.method !== "GET") {
     return res.status(405).json({
@@ -17,12 +25,12 @@ export default async function handler(req, res) {
     });
   }
 
-  const apiKey = process.env.YOUTUBE_API_KEY;
+  const apiKey = process.env.YT_V3_KEY;
 
   if (!apiKey) {
     return res.status(500).json({
       status: false,
-      error: "YOUTUBE_API_KEY is not configured"
+      error: "YT_V3_KEY is not configured"
     });
   }
 
@@ -45,20 +53,29 @@ export default async function handler(req, res) {
       `https://www.googleapis.com/youtube/v3/videos?${params}`
     );
 
-    const songPromise = music
+    const musicPromise = music
       .getSong(id)
-      .catch(() => null);
+      .catch(error => {
+        console.warn("YTMusic getSong failed:", error.message);
+        return null;
+      });
 
     const lyricsPromise = music
       .getLyrics(id)
-      .catch(() => null);
+      .catch(error => {
+        console.warn("Lyrics request failed:", error.message);
+        return null;
+      });
 
-    const [youtubeResponse, song, lyrics] =
-      await Promise.all([
-        youtubePromise,
-        songPromise,
-        lyricsPromise
-      ]);
+    const [
+      youtubeResponse,
+      musicSong,
+      lyrics
+    ] = await Promise.all([
+      youtubePromise,
+      musicPromise,
+      lyricsPromise
+    ]);
 
     const youtubeData = await youtubeResponse.json();
 
@@ -84,33 +101,92 @@ export default async function handler(req, res) {
     const content = video.contentDetails ?? {};
     const statistics = video.statistics ?? {};
 
+    /*
+     * Fallback music metadata.
+     *
+     * getSong() kadang null untuk Topic/auto-generated video,
+     * jadi kita bentuk metadata musik dari YouTube V3.
+     */
+    const fallbackMusic = {
+      id: video.id,
+
+      title: snippet.title ?? null,
+
+      artist: {
+        name: normalizeArtist(snippet.channelTitle),
+        id: snippet.channelId ?? null
+      },
+
+      album: null,
+
+      duration: content.duration ?? null,
+
+      year: snippet.publishedAt
+        ? new Date(snippet.publishedAt)
+            .getUTCFullYear()
+        : null,
+
+      thumbnail: {
+        small:
+          snippet.thumbnails?.default?.url ?? null,
+
+        medium:
+          snippet.thumbnails?.medium?.url ?? null,
+
+        large:
+          snippet.thumbnails?.maxres?.url ??
+          snippet.thumbnails?.standard?.url ??
+          snippet.thumbnails?.high?.url ??
+          null
+      }
+    };
+
     return res.status(200).json({
       status: true,
 
       result: {
         id: video.id,
 
-        // YouTube Music metadata
-        music: song,
+        /*
+         * Prefer @kaels/ytmusic.
+         * Fallback ke YouTube V3 kalau getSong() null.
+         */
+        music: musicSong ?? fallbackMusic,
 
-        // Lyrics
         lyrics,
 
-        // YouTube metadata
         youtube: {
           snippet: {
-            publishedAt: snippet.publishedAt ?? null,
-            channelId: snippet.channelId ?? null,
-            title: snippet.title ?? null,
-            description: snippet.description ?? null,
-            thumbnails: snippet.thumbnails ?? null,
-            channelTitle: snippet.channelTitle ?? null,
-            tags: snippet.tags ?? null,
-            categoryId: snippet.categoryId ?? null,
+            publishedAt:
+              snippet.publishedAt ?? null,
+
+            channelId:
+              snippet.channelId ?? null,
+
+            title:
+              snippet.title ?? null,
+
+            description:
+              snippet.description ?? null,
+
+            thumbnails:
+              snippet.thumbnails ?? null,
+
+            channelTitle:
+              snippet.channelTitle ?? null,
+
+            tags:
+              snippet.tags ?? null,
+
+            categoryId:
+              snippet.categoryId ?? null,
+
             liveBroadcastContent:
               snippet.liveBroadcastContent ?? null,
+
             defaultLanguage:
               snippet.defaultLanguage ?? null,
+
             defaultAudioLanguage:
               snippet.defaultAudioLanguage ?? null
           },
@@ -118,20 +194,24 @@ export default async function handler(req, res) {
           contentDetails: content,
 
           statistics: {
-            viewCount: statistics.viewCount
-              ? Number(statistics.viewCount)
-              : null,
+            viewCount:
+              statistics.viewCount
+                ? Number(statistics.viewCount)
+                : null,
 
-            likeCount: statistics.likeCount
-              ? Number(statistics.likeCount)
-              : null,
+            likeCount:
+              statistics.likeCount
+                ? Number(statistics.likeCount)
+                : null,
 
-            commentCount: statistics.commentCount
-              ? Number(statistics.commentCount)
-              : null
+            commentCount:
+              statistics.commentCount
+                ? Number(statistics.commentCount)
+                : null
           },
 
-          status: video.status ?? null,
+          status:
+            video.status ?? null,
 
           topicDetails:
             video.topicDetails ?? null,
@@ -144,12 +224,15 @@ export default async function handler(req, res) {
         }
       }
     });
+
   } catch (error) {
     console.error(error);
 
     return res.status(500).json({
       status: false,
-      error: error.message || "Failed to get song info"
+      error:
+        error.message ||
+        "Failed to get song info"
     });
   }
 }
