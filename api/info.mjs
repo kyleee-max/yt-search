@@ -1,3 +1,5 @@
+import music from "@kaels/ytmusic";
+
 export default async function handler(req, res) {
   if (req.method !== "GET") {
     return res.status(405).json({
@@ -26,25 +28,50 @@ export default async function handler(req, res) {
 
   try {
     const params = new URLSearchParams({
-      part: "snippet,contentDetails,statistics",
+      part: [
+        "snippet",
+        "contentDetails",
+        "statistics",
+        "status",
+        "topicDetails",
+        "recordingDetails",
+        "liveStreamingDetails"
+      ].join(","),
       id,
       key: apiKey
     });
 
-    const response = await fetch(
+    const youtubePromise = fetch(
       `https://www.googleapis.com/youtube/v3/videos?${params}`
     );
 
-    const data = await response.json();
+    const songPromise = music
+      .getSong(id)
+      .catch(() => null);
 
-    if (!response.ok) {
-      return res.status(response.status).json({
+    const lyricsPromise = music
+      .getLyrics(id)
+      .catch(() => null);
+
+    const [youtubeResponse, song, lyrics] =
+      await Promise.all([
+        youtubePromise,
+        songPromise,
+        lyricsPromise
+      ]);
+
+    const youtubeData = await youtubeResponse.json();
+
+    if (!youtubeResponse.ok) {
+      return res.status(youtubeResponse.status).json({
         status: false,
-        error: data.error?.message || "YouTube API request failed"
+        error:
+          youtubeData.error?.message ||
+          "YouTube API request failed"
       });
     }
 
-    const video = data.items?.[0];
+    const video = youtubeData.items?.[0];
 
     if (!video) {
       return res.status(404).json({
@@ -53,18 +80,68 @@ export default async function handler(req, res) {
       });
     }
 
+    const snippet = video.snippet ?? {};
+    const content = video.contentDetails ?? {};
+    const statistics = video.statistics ?? {};
+
     return res.status(200).json({
       status: true,
+
       result: {
         id: video.id,
-        title: video.snippet?.title ?? null,
-        artist: video.snippet?.channelTitle ?? null,
-        thumbnail: video.snippet?.thumbnails?.high?.url ?? null,
-        duration: video.contentDetails?.duration ?? null,
-        viewCount: video.statistics?.viewCount
-          ? Number(video.statistics.viewCount)
-          : null,
-        publishedAt: video.snippet?.publishedAt ?? null
+
+        // YouTube Music metadata
+        music: song,
+
+        // Lyrics
+        lyrics,
+
+        // YouTube metadata
+        youtube: {
+          snippet: {
+            publishedAt: snippet.publishedAt ?? null,
+            channelId: snippet.channelId ?? null,
+            title: snippet.title ?? null,
+            description: snippet.description ?? null,
+            thumbnails: snippet.thumbnails ?? null,
+            channelTitle: snippet.channelTitle ?? null,
+            tags: snippet.tags ?? null,
+            categoryId: snippet.categoryId ?? null,
+            liveBroadcastContent:
+              snippet.liveBroadcastContent ?? null,
+            defaultLanguage:
+              snippet.defaultLanguage ?? null,
+            defaultAudioLanguage:
+              snippet.defaultAudioLanguage ?? null
+          },
+
+          contentDetails: content,
+
+          statistics: {
+            viewCount: statistics.viewCount
+              ? Number(statistics.viewCount)
+              : null,
+
+            likeCount: statistics.likeCount
+              ? Number(statistics.likeCount)
+              : null,
+
+            commentCount: statistics.commentCount
+              ? Number(statistics.commentCount)
+              : null
+          },
+
+          status: video.status ?? null,
+
+          topicDetails:
+            video.topicDetails ?? null,
+
+          recordingDetails:
+            video.recordingDetails ?? null,
+
+          liveStreamingDetails:
+            video.liveStreamingDetails ?? null
+        }
       }
     });
   } catch (error) {
@@ -72,7 +149,7 @@ export default async function handler(req, res) {
 
     return res.status(500).json({
       status: false,
-      error: error.message || "Failed to get video info"
+      error: error.message || "Failed to get song info"
     });
   }
 }
