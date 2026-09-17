@@ -27,12 +27,17 @@ export default async function handler(req, res) {
           'User-Agent': 'Mozilla/5.0',
           'Accept': 'application/json'
         },
-        timeout: 10000
+        timeout: 10000,
+        responseType: 'text'
       }
     )
 
     return res.status(200).json({
       status: true,
+      statusCode: response.status,
+      contentType: response.headers['content-type'] || null,
+      dataType: typeof response.data,
+      length: response.data?.length ?? 0,
       result: response.data
     })
   } catch (error) {
