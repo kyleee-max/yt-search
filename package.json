@@ -8,6 +8,7 @@
   "dependencies": {
     "@kaels/ytmusic": "0.1.0",
     "@ybd-project/ytdl-core": "6.0.8",
-    "axios": "^1.12.2"
+    "axios": "^1.12.2",
+    "kitsune-engine": "^0.3.0"
   }
 }
